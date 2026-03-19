@@ -73,6 +73,21 @@ The `-r dotenv/config` flag preloads env vars before any module import, which is
 
 ---
 
+## Step 4: Recipe Detail Page
+
+**New query functions** in `src/lib/queries/recipes.ts`:
+- `getRecipeBySlug(slug)` -- left joins users for author name, parallel fetches platforms (with `platformSpecificNotes`) + tags; returns `RecipeDetail | null`
+- `getRelatedRecipes(recipeId, category, limit?)` -- same category, excludes self, ordered by upvotes desc, uses `attachRelations`
+
+**New component:**
+- `src/components/CopyButton.tsx` -- client component; `navigator.clipboard.writeText()`, cycles through idle/copied/error states with 2s reset
+
+**New pages:**
+- `src/app/recipes/[slug]/page.tsx` -- `generateMetadata` for SEO; breadcrumb (Home > Recipes > Category > Title); header with title, category badge, platform + tag pills, upvote count, author; description; instructions block with `CopyButton`; platform-specific notes section (hidden when none); Test CTA card; related recipes grid
+- `src/app/recipes/[slug]/not-found.tsx` -- friendly 404 with link back to /recipes
+
+---
+
 ## Current File Tree
 
 ```
@@ -92,9 +107,13 @@ promptocean/
 │   │   ├── layout.tsx
 │   │   ├── page.tsx            # homepage
 │   │   └── recipes/
-│   │       └── page.tsx        # search + browse page
+│   │       ├── page.tsx        # search + browse page
+│   │       └── [slug]/
+│   │           ├── page.tsx    # recipe detail
+│   │           └── not-found.tsx
 │   ├── components/
 │   │   ├── CategoryCard.tsx
+│   │   ├── CopyButton.tsx
 │   │   ├── RecipeCard.tsx
 │   │   └── SearchBar.tsx
 │   ├── db/
@@ -122,7 +141,7 @@ promptocean/
 ## Not Built Yet
 
 - **Auth** — no Auth.js / NextAuth setup; `users` table is schema-only
-- **Recipe detail page** — no `src/app/recipes/[slug]/page.tsx` yet
+- **Upvoting** — `upvotes` column exists, no UI action to increment it yet
 - **API routes** — no route handlers yet
 - **Stripe** — `stripe_customer_id` column exists on `users`, nothing else
 - **Recipe testing UI** — the feature that consumes `test_history`

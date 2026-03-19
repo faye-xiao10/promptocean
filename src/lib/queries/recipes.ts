@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { recipes, platforms, tags, recipePlatforms, recipeTags } from '@/db/schema';
-import { eq, and, desc, inArray, sql } from 'drizzle-orm';
+import { recipes, platforms, tags, recipePlatforms, recipeTags, users } from '@/db/schema';
+import { eq, and, desc, inArray, sql, ne } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -9,6 +9,12 @@ import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 export type RecipeWithRelations = typeof recipes.$inferSelect & {
   platforms: { name: string; slug: string }[];
   tags: { name: string; category: string }[];
+};
+
+export type RecipeDetail = typeof recipes.$inferSelect & {
+  platforms: { name: string; slug: string; platformSpecificNotes: string | null }[];
+  tags: { name: string; category: string }[];
+  authorName: string | null;
 };
 
 export type CategoryCount = {
@@ -186,6 +192,62 @@ export async function searchRecipes(params: SearchParams): Promise<RecipeWithRel
       .where(whereClause)
       .orderBy(desc(recipes.upvotes), desc(recipes.createdAt));
   }
+
+  return attachRelations(rows);
+}
+
+// ---------------------------------------------------------------------------
+// Detail
+// ---------------------------------------------------------------------------
+
+export async function getRecipeBySlug(slug: string): Promise<RecipeDetail | null> {
+  const rows = await db
+    .select({ recipe: recipes, authorName: users.name })
+    .from(recipes)
+    .leftJoin(users, eq(recipes.authorId, users.id))
+    .where(eq(recipes.slug, slug));
+
+  if (rows.length === 0) return null;
+
+  const { recipe, authorName } = rows[0];
+
+  const [platformRows, tagRows] = await Promise.all([
+    db
+      .select({
+        name: platforms.name,
+        slug: platforms.slug,
+        platformSpecificNotes: recipePlatforms.platformSpecificNotes,
+      })
+      .from(recipePlatforms)
+      .innerJoin(platforms, eq(recipePlatforms.platformId, platforms.id))
+      .where(eq(recipePlatforms.recipeId, recipe.id)),
+
+    db
+      .select({ name: tags.name, category: tags.category })
+      .from(recipeTags)
+      .innerJoin(tags, eq(recipeTags.tagId, tags.id))
+      .where(eq(recipeTags.recipeId, recipe.id)),
+  ]);
+
+  return {
+    ...recipe,
+    platforms: platformRows,
+    tags: tagRows,
+    authorName: authorName ?? null,
+  };
+}
+
+export async function getRelatedRecipes(
+  recipeId: string,
+  category: string,
+  limit = 3
+): Promise<RecipeWithRelations[]> {
+  const rows = await db
+    .select()
+    .from(recipes)
+    .where(and(sql`${recipes.category} = ${category}`, ne(recipes.id, recipeId)))
+    .orderBy(desc(recipes.upvotes))
+    .limit(limit);
 
   return attachRelations(rows);
 }
