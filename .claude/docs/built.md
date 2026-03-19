@@ -49,6 +49,30 @@ The `-r dotenv/config` flag preloads env vars before any module import, which is
 
 ---
 
+## Step 3: Recipe Discovery UI
+
+**Query layer** (`src/lib/queries/recipes.ts`):
+- `getFeaturedRecipes()` -- featured=true, ordered by `created_at` desc, with platforms + tags
+- `getCategories()` -- GROUP BY category with `count(*)::int`, ordered by count desc
+- `getPlatforms()` -- all platforms ordered by name, used for filter bar
+- `searchRecipes({ query, category, platform, tags })` -- dynamic WHERE builder:
+  - Text: `search_vector @@ to_tsquery(...)`, ordered by `ts_rank(...)` desc
+  - Category: raw SQL equality to avoid enum type casting issues
+  - Platform: `inArray` with subquery through `recipe_platforms`
+  - Tags: one `inArray` subquery per tag (must match ALL tags)
+  - `attachRelations()` helper fetches platforms + tags in 2 parallel queries after filtering
+
+**Shared components** (`src/components/`):
+- `RecipeCard.tsx` -- server component; category color badge, `line-clamp-2` description, platform pills, tag pills (first 3), upvote count
+- `CategoryCard.tsx` -- server component; emoji + name + count, links to `?category=X`
+- `SearchBar.tsx` -- client component; `useRouter` navigation, `defaultValue` prop for pre-fill
+
+**Pages:**
+- `src/app/page.tsx` -- hero + SearchBar + featured grid + category grid + footer
+- `src/app/recipes/page.tsx` -- awaits `searchParams` (Next.js 15), category/platform filter pills with active state, `buildUrl` helper preserves other params, result count + clear link, empty state
+
+---
+
 ## Current File Tree
 
 ```
@@ -62,24 +86,33 @@ promptocean/
 ├── drizzle.config.ts
 ├── package.json
 ├── src/
-│   ├── app/                    # default Next.js app scaffold
+│   ├── app/
 │   │   ├── favicon.ico
 │   │   ├── globals.css
 │   │   ├── layout.tsx
-│   │   └── page.tsx
-│   └── db/
-│       ├── index.ts            # drizzle instance (neon-http)
-│       ├── seed.ts
-│       ├── migrations/         # empty until db:push runs
-│       └── schema/
-│           ├── index.ts        # barrel export
-│           ├── users.ts
-│           ├── recipes.ts
-│           ├── platforms.ts
-│           ├── recipe_platforms.ts
-│           ├── tags.ts
-│           ├── recipe_tags.ts
-│           └── test_history.ts
+│   │   ├── page.tsx            # homepage
+│   │   └── recipes/
+│   │       └── page.tsx        # search + browse page
+│   ├── components/
+│   │   ├── CategoryCard.tsx
+│   │   ├── RecipeCard.tsx
+│   │   └── SearchBar.tsx
+│   ├── db/
+│   │   ├── index.ts            # drizzle instance (neon-http)
+│   │   ├── seed.ts
+│   │   ├── migrations/         # empty until db:push runs
+│   │   └── schema/
+│   │       ├── index.ts        # barrel export
+│   │       ├── users.ts
+│   │       ├── recipes.ts
+│   │       ├── platforms.ts
+│   │       ├── recipe_platforms.ts
+│   │       ├── tags.ts
+│   │       ├── recipe_tags.ts
+│   │       └── test_history.ts
+│   └── lib/
+│       └── queries/
+│           └── recipes.ts
 ├── tsconfig.json
 └── ...
 ```
@@ -89,9 +122,8 @@ promptocean/
 ## Not Built Yet
 
 - **Auth** — no Auth.js / NextAuth setup; `users` table is schema-only
-- **UI / Pages** — only the default Next.js scaffold page exists
+- **Recipe detail page** — no `src/app/recipes/[slug]/page.tsx` yet
 - **API routes** — no route handlers yet
 - **Stripe** — `stripe_customer_id` column exists on `users`, nothing else
 - **Recipe testing UI** — the feature that consumes `test_history`
-- **Search** — `search_vector` tsvector column is in place, no query layer yet
 - **Admin / moderation** — no tooling for managing recipes or users
