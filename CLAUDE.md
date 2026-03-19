@@ -36,6 +36,8 @@ End of every feature:
 3. Update `.claude/docs/data-model.md` if any tables, fields, or indexes changed
 4. Commit the doc updates along with the feature commit
 
+Trigger phrases ("wrap up", "done", "update docs", "end of feature") = run end-of-feature protocol immediately. Not optional.
+
 ## Additional Docs
 Before starting any task, check if relevant docs exist in `.claude/docs/`. Read them before proceeding -- do not assume.
 
