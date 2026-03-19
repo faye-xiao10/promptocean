@@ -1,0 +1,191 @@
+import { db } from '@/db';
+import { recipes, platforms, tags, recipePlatforms, recipeTags } from '@/db/schema';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type RecipeWithRelations = typeof recipes.$inferSelect & {
+  platforms: { name: string; slug: string }[];
+  tags: { name: string; category: string }[];
+};
+
+export type CategoryCount = {
+  category: string;
+  count: number;
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function attachRelations(
+  recipeRows: (typeof recipes.$inferSelect)[]
+): Promise<RecipeWithRelations[]> {
+  if (recipeRows.length === 0) return [];
+
+  const ids = recipeRows.map((r) => r.id);
+
+  const [platformRows, tagRows] = await Promise.all([
+    db
+      .select({
+        recipeId: recipePlatforms.recipeId,
+        name: platforms.name,
+        slug: platforms.slug,
+      })
+      .from(recipePlatforms)
+      .innerJoin(platforms, eq(recipePlatforms.platformId, platforms.id))
+      .where(inArray(recipePlatforms.recipeId, ids)),
+
+    db
+      .select({
+        recipeId: recipeTags.recipeId,
+        name: tags.name,
+        category: tags.category,
+      })
+      .from(recipeTags)
+      .innerJoin(tags, eq(recipeTags.tagId, tags.id))
+      .where(inArray(recipeTags.recipeId, ids)),
+  ]);
+
+  const platformsByRecipe = new Map<string, { name: string; slug: string }[]>();
+  const tagsByRecipe = new Map<string, { name: string; category: string }[]>();
+
+  for (const row of platformRows) {
+    if (!platformsByRecipe.has(row.recipeId)) platformsByRecipe.set(row.recipeId, []);
+    platformsByRecipe.get(row.recipeId)!.push({ name: row.name, slug: row.slug });
+  }
+
+  for (const row of tagRows) {
+    if (!tagsByRecipe.has(row.recipeId)) tagsByRecipe.set(row.recipeId, []);
+    tagsByRecipe.get(row.recipeId)!.push({ name: row.name, category: row.category });
+  }
+
+  return recipeRows.map((recipe) => ({
+    ...recipe,
+    platforms: platformsByRecipe.get(recipe.id) ?? [],
+    tags: tagsByRecipe.get(recipe.id) ?? [],
+  }));
+}
+
+function buildTsQuery(input: string): string {
+  return input
+    .trim()
+    .split(/\s+/)
+    .map((term) => term.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean)
+    .join(' & ');
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
+export async function getFeaturedRecipes(): Promise<RecipeWithRelations[]> {
+  const rows = await db
+    .select()
+    .from(recipes)
+    .where(eq(recipes.featured, true))
+    .orderBy(desc(recipes.createdAt));
+
+  return attachRelations(rows);
+}
+
+export async function getCategories(): Promise<CategoryCount[]> {
+  const rows = await db
+    .select({
+      category: recipes.category,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(recipes)
+    .groupBy(recipes.category)
+    .orderBy(sql`count(*) desc`);
+
+  return rows.map((r) => ({ category: r.category, count: r.count }));
+}
+
+export async function getPlatforms(): Promise<{ name: string; slug: string }[]> {
+  return db
+    .select({ name: platforms.name, slug: platforms.slug })
+    .from(platforms)
+    .orderBy(platforms.name);
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+type SearchParams = {
+  query?: string;
+  category?: string;
+  platform?: string;
+  tags?: string[];
+};
+
+export async function searchRecipes(params: SearchParams): Promise<RecipeWithRelations[]> {
+  const { query, category, platform, tags: tagFilters } = params;
+
+  const tsQueryStr = query ? buildTsQuery(query) : null;
+  const conditions = [];
+
+  if (tsQueryStr) {
+    conditions.push(
+      sql`${recipes.searchVector} @@ to_tsquery('english', ${tsQueryStr})`
+    );
+  }
+
+  if (category) {
+    conditions.push(sql`${recipes.category} = ${category}`);
+  }
+
+  if (platform) {
+    conditions.push(
+      inArray(
+        recipes.id,
+        db
+          .select({ id: recipePlatforms.recipeId })
+          .from(recipePlatforms)
+          .innerJoin(platforms, eq(recipePlatforms.platformId, platforms.id))
+          .where(eq(platforms.slug, platform))
+      )
+    );
+  }
+
+  if (tagFilters && tagFilters.length > 0) {
+    for (const tagName of tagFilters) {
+      conditions.push(
+        inArray(
+          recipes.id,
+          db
+            .select({ id: recipeTags.recipeId })
+            .from(recipeTags)
+            .innerJoin(tags, eq(recipeTags.tagId, tags.id))
+            .where(eq(tags.name, tagName))
+        )
+      );
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  let rows: (typeof recipes.$inferSelect)[];
+
+  if (tsQueryStr) {
+    rows = await db
+      .select()
+      .from(recipes)
+      .where(whereClause)
+      .orderBy(
+        sql`ts_rank(${recipes.searchVector}, to_tsquery('english', ${tsQueryStr})) desc`
+      );
+  } else {
+    rows = await db
+      .select()
+      .from(recipes)
+      .where(whereClause)
+      .orderBy(desc(recipes.upvotes), desc(recipes.createdAt));
+  }
+
+  return attachRelations(rows);
+}

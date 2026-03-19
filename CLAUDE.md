@@ -27,6 +27,7 @@ npm run db:studio
 * Always work on a feature branch, never directly on main. Before making any changes, check the current branch with git branch. If on main, create and switch to a new branch with git checkout -b feature/[name] before proceeding.
 * dev is the primary working branch. Feature branches merge into dev, not main. Only dev merges into main when ready to deploy. Never push directly to main.
 
+
 ## Session Protocol
 Start of every session: Read all files in `.claude/docs/` and summarize the current state of the project before doing anything else.
 
