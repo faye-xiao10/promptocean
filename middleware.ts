@@ -11,5 +11,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ['/submit', '/dashboard'],
+  matcher: ['/submit', '/dashboard', '/recipes/:slug*/test'],
 };

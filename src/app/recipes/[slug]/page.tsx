@@ -167,9 +167,12 @@ export default async function RecipeDetailPage({ params }: PageProps) {
                 Try it against Claude, GPT-4o, or Gemini and compare results side by side.
               </p>
             </div>
-            <button className="shrink-0 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors">
+            <Link
+              href={`/recipes/${recipe.slug}/test`}
+              className="shrink-0 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 transition-colors"
+            >
               Test recipe
-            </button>
+            </Link>
           </div>
         </section>
       </div>

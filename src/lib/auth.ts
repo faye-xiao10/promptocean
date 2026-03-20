@@ -10,6 +10,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: { params: { prompt: 'select_account' } },
     }),
   ],
   session: { strategy: 'jwt' },
@@ -47,38 +48,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
 
     async jwt({ token, account }) {
-      // account is only present on the initial sign-in
+      // account is only present on the initial sign-in -- do one DB query here,
+      // store everything in the token so the session callback never hits the DB.
       if (account && token.email) {
-        const dbUser = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, token.email))
-          .limit(1);
-
-        if (dbUser.length > 0) {
-          token.userId = dbUser[0].id;
-        }
-      }
-      return token;
-    },
-
-    async session({ session, token }) {
-      if (token.userId && typeof token.userId === 'string') {
-        const dbUser = await db
+        const [dbUser] = await db
           .select({
             id: users.id,
             subscriptionStatus: users.subscriptionStatus,
             freeTestsRemaining: users.freeTestsRemaining,
           })
           .from(users)
-          .where(eq(users.id, token.userId))
+          .where(eq(users.email, token.email))
           .limit(1);
 
-        if (dbUser.length > 0) {
-          session.user.id = dbUser[0].id;
-          session.user.subscriptionStatus = dbUser[0].subscriptionStatus;
-          session.user.freeTestsRemaining = dbUser[0].freeTestsRemaining;
+        if (dbUser) {
+          token.userId = dbUser.id;
+          token.subscriptionStatus = dbUser.subscriptionStatus;
+          token.freeTestsRemaining = dbUser.freeTestsRemaining;
         }
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      // Read from the token only -- no DB query.
+      if (typeof token.userId === 'string') {
+        session.user.id = token.userId;
+        session.user.subscriptionStatus =
+          typeof token.subscriptionStatus === 'string' ? token.subscriptionStatus : 'free';
+        session.user.freeTestsRemaining =
+          typeof token.freeTestsRemaining === 'number' ? token.freeTestsRemaining : 0;
       }
       return session;
     },
