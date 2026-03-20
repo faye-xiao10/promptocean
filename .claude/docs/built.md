@@ -68,7 +68,7 @@ The `-r dotenv/config` flag preloads env vars before any module import, which is
 - `SearchBar.tsx` -- client component; `useRouter` navigation, `defaultValue` prop for pre-fill
 
 **Pages:**
-- `src/app/page.tsx` -- hero + SearchBar + featured grid + category grid + footer
+- `src/app/page.tsx` -- hero + SearchBar + featured grid + category grid
 - `src/app/recipes/page.tsx` -- awaits `searchParams` (Next.js 15), category/platform filter pills with active state, `buildUrl` helper preserves other params, result count + clear link, empty state
 
 ---
@@ -137,7 +137,8 @@ promptocean/
 │   │       └── recipes.ts
 │   └── types/
 │       └── next-auth.d.ts
-├── middleware.ts               # route protection (project root)
+├── middleware.ts               # route protection (project root, NOT src/)
+├── next.config.ts              # image remotePatterns for Google profile photos
 ├── tsconfig.json
 └── ...
 ```
@@ -157,6 +158,7 @@ promptocean/
 - `src/components/AuthButton.tsx` -- client component; `useSession` for state, `signIn('google')` / `signOut()` from `next-auth/react`; loading skeleton while session resolves
 - `src/components/SessionProvider.tsx` -- thin client wrapper around `SessionProvider` from `next-auth/react`
 - `src/app/layout.tsx` -- global nav (PromptOcean logo, Browse, Submit, AuthButton) + shared footer; per-page navs/footers removed from all three existing pages
+- `next.config.ts` -- `images.remotePatterns` whitelists `lh3.googleusercontent.com` for Google profile photos
 - `.env.example` updated with `AUTH_SECRET`, `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 
 **No separate accounts/sessions/verification_tokens tables** -- JWT strategy only; `users` table is the single source of truth.
@@ -165,9 +167,9 @@ promptocean/
 
 ## Not Built Yet
 
-- **Auth** -- Google OAuth works; no other providers
-- **Upvoting** — `upvotes` column exists, no UI action to increment it yet
-- **API routes** — no route handlers yet
-- **Stripe** — `stripe_customer_id` column exists on `users`, nothing else
-- **Recipe testing UI** — the feature that consumes `test_history`
-- **Admin / moderation** — no tooling for managing recipes or users
+- **Submit page** -- `/submit` route protected by middleware but page doesn't exist yet
+- **Dashboard** -- `/dashboard` route protected but page doesn't exist yet
+- **Upvoting** -- `upvotes` column exists, no UI action to increment it yet
+- **Stripe** -- `stripe_customer_id` column exists on `users`, nothing else
+- **Recipe testing UI** -- the feature that consumes `test_history`
+- **Admin / moderation** -- no tooling for managing recipes or users
