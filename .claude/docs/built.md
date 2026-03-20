@@ -170,6 +170,43 @@ The `-r dotenv/config` flag preloads env vars before any module import, which is
 
 ---
 
+## Step 8: Stripe Subscriptions (branch: feature/stripe)
+
+**Stripe client** (`src/lib/stripe.ts`):
+- Initialized with `STRIPE_SECRET_KEY` and current SDK API version (`2026-02-25.clover`)
+
+**Checkout API** (`src/app/api/stripe/checkout/route.ts`):
+- POST, auth-gated (401 if no session)
+- Fetches user from DB; returns 400 if already `active`
+- Creates Stripe Checkout Session: mode `subscription`, `STRIPE_PRICE_ID`, success redirects to `/`, cancel to `/pricing?canceled=true`
+- Passes `customer` (returning users with `stripe_customer_id`) or `customer_email` (new); sets `metadata.userId` for webhook lookup
+- Returns `{ url }`
+
+**Webhook handler** (`src/app/api/webhooks/stripe/route.ts`):
+- POST, not in middleware matcher (Stripe must reach it unauthenticated)
+- Reads raw body via `req.text()`; verifies signature with `STRIPE_WEBHOOK_SECRET`; returns 400 on failure
+- `checkout.session.completed`: sets `subscription_status = 'active'`, stores `stripe_customer_id`
+- `customer.subscription.deleted`: sets `subscription_status = 'canceled'`
+- `invoice.payment_failed`: sets `subscription_status = 'past_due'`
+- Returns 200 for all unhandled events so Stripe does not retry
+
+**Pricing page** (`src/app/pricing/page.tsx`):
+- Server component; awaits `searchParams` Promise (Next.js 15); reads session server-side for subscription state
+- Free tier card + Pro tier card ($7/mo) with "Recommended" badge and indigo highlight
+- Success/canceled banners driven by `?success=true` / `?canceled=true` query params
+
+**CheckoutButton** (`src/components/CheckoutButton.tsx`):
+- Client component; POSTs to `/api/stripe/checkout`, redirects via `window.location.href`; loading + error states
+- Shows "You're subscribed" (green badge) when `isSubscribed` prop is true
+
+**Other changes:**
+- `TestPlayground.tsx` -- paywall "View pricing" link updated from `#` to `/pricing`
+- `layout.tsx` -- Pricing link added to nav between Submit and AuthButton
+
+**Local dev:** `stripe listen --forward-to localhost:3000/api/webhooks/stripe`; use the printed `whsec_...` as `STRIPE_WEBHOOK_SECRET` in `.env.local`.
+
+---
+
 ## Current File Tree
 
 ```
@@ -192,12 +229,20 @@ promptocean/
 │   │   │   ├── auth/
 │   │   │   │   └── [...nextauth]/
 │   │   │   │       └── route.ts
-│   │   │   └── test/
-│   │   │       └── route.ts
+│   │   │   ├── stripe/
+│   │   │   │   └── checkout/
+│   │   │   │       └── route.ts    # POST -- creates Stripe Checkout Session
+│   │   │   ├── test/
+│   │   │   │   └── route.ts
+│   │   │   └── webhooks/
+│   │   │       └── stripe/
+│   │   │           └── route.ts    # POST -- handles Stripe webhook events
 │   │   ├── favicon.ico
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
+│   │   ├── pricing/
+│   │   │   └── page.tsx
 │   │   ├── recipes/
 │   │   │   ├── page.tsx
 │   │   │   └── [slug]/
@@ -210,6 +255,7 @@ promptocean/
 │   ├── components/
 │   │   ├── AuthButton.tsx
 │   │   ├── CategoryCard.tsx
+│   │   ├── CheckoutButton.tsx
 │   │   ├── CopyButton.tsx
 │   │   ├── RecipeCard.tsx
 │   │   ├── SearchBar.tsx
@@ -232,8 +278,9 @@ promptocean/
 │   │   ├── ai/
 │   │   │   └── providers.ts
 │   │   ├── auth.ts
-│   │   └── queries/
-│   │       └── recipes.ts
+│   │   ├── queries/
+│   │   │   └── recipes.ts
+│   │   └── stripe.ts
 │   └── types/
 │       └── next-auth.d.ts
 └── tsconfig.json
@@ -246,5 +293,4 @@ promptocean/
 - **Submit review/moderation** -- recipes submitted by users go live immediately, no review queue
 - **Dashboard** -- `/dashboard` route protected but page doesn't exist yet
 - **Upvoting** -- `upvotes` column exists, no UI action to increment it yet
-- **Stripe / pricing** -- `stripe_customer_id` column exists on `users`; `/pricing` page linked from paywall message but not yet built
 - **Admin / moderation** -- no tooling for managing recipes or users
