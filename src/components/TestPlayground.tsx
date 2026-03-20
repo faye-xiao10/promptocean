@@ -282,7 +282,7 @@ export function TestPlayground({
                 Subscribe for unlimited testing across all models.
               </p>
               <Link
-                href="#"
+                href="/pricing"
                 className="inline-block px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
               >
                 View pricing

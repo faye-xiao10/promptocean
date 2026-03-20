@@ -41,6 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link href="/submit" className="hover:text-gray-900 transition-colors">
                     Submit
                   </Link>
+                  <Link href="/pricing" className="hover:text-gray-900 transition-colors">
+                    Pricing
+                  </Link>
                 </nav>
               </div>
               <AuthButton />
