@@ -11,21 +11,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Nav */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-bold text-gray-900 text-lg">
-            PromptOcean
-          </Link>
-          <nav className="flex items-center gap-6 text-sm text-gray-600">
-            <Link href="/recipes" className="hover:text-gray-900 transition-colors">
-              Browse
-            </Link>
-          </nav>
-        </div>
-      </header>
-
+    <>
       {/* Hero */}
       <section className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center">
@@ -75,17 +61,6 @@ export default async function HomePage() {
           </section>
         )}
       </main>
-
-      <footer className="bg-white border-t border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex items-center justify-between text-sm text-gray-500">
-          <span className="font-semibold text-gray-900">PromptOcean</span>
-          <nav className="flex gap-6">
-            <Link href="/recipes" className="hover:text-gray-900 transition-colors">
-              Browse
-            </Link>
-          </nav>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 }

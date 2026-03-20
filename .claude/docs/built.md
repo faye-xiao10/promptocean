@@ -112,10 +112,12 @@ promptocean/
 │   │           ├── page.tsx    # recipe detail
 │   │           └── not-found.tsx
 │   ├── components/
+│   │   ├── AuthButton.tsx
 │   │   ├── CategoryCard.tsx
 │   │   ├── CopyButton.tsx
 │   │   ├── RecipeCard.tsx
-│   │   └── SearchBar.tsx
+│   │   ├── SearchBar.tsx
+│   │   └── SessionProvider.tsx
 │   ├── db/
 │   │   ├── index.ts            # drizzle instance (neon-http)
 │   │   ├── seed.ts
@@ -129,18 +131,41 @@ promptocean/
 │   │       ├── tags.ts
 │   │       ├── recipe_tags.ts
 │   │       └── test_history.ts
-│   └── lib/
-│       └── queries/
-│           └── recipes.ts
+│   ├── lib/
+│   │   ├── auth.ts
+│   │   └── queries/
+│   │       └── recipes.ts
+│   └── types/
+│       └── next-auth.d.ts
+├── middleware.ts               # route protection (project root)
 ├── tsconfig.json
 └── ...
 ```
 
 ---
 
+## Step 5: Auth (NextAuth v5 + Google OAuth)
+
+- `next-auth@beta` installed
+- `src/lib/auth.ts` -- NextAuth config with JWT strategy, Google provider, three callbacks:
+  - `signIn`: upserts user in `users` table by email (insert on first login, update name/image if changed)
+  - `jwt`: on initial sign-in, looks up DB user by email and attaches `token.userId` (our uuid, not Google's sub)
+  - `session`: fetches `subscriptionStatus` and `freeTestsRemaining` from DB on each session access; attaches `id`, `subscriptionStatus`, `freeTestsRemaining` to `session.user`
+- `src/types/next-auth.d.ts` -- augments `Session` (id, subscriptionStatus, freeTestsRemaining) and `JWT` (userId)
+- `src/app/api/auth/[...nextauth]/route.ts` -- exports GET and POST from handlers
+- `middleware.ts` (project root) -- route protection for `/submit` and `/dashboard`; redirects unauthenticated users to sign-in with `callbackUrl`
+- `src/components/AuthButton.tsx` -- client component; `useSession` for state, `signIn('google')` / `signOut()` from `next-auth/react`; loading skeleton while session resolves
+- `src/components/SessionProvider.tsx` -- thin client wrapper around `SessionProvider` from `next-auth/react`
+- `src/app/layout.tsx` -- global nav (PromptOcean logo, Browse, Submit, AuthButton) + shared footer; per-page navs/footers removed from all three existing pages
+- `.env.example` updated with `AUTH_SECRET`, `NEXTAUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+
+**No separate accounts/sessions/verification_tokens tables** -- JWT strategy only; `users` table is the single source of truth.
+
+---
+
 ## Not Built Yet
 
-- **Auth** — no Auth.js / NextAuth setup; `users` table is schema-only
+- **Auth** -- Google OAuth works; no other providers
 - **Upvoting** — `upvotes` column exists, no UI action to increment it yet
 - **API routes** — no route handlers yet
 - **Stripe** — `stripe_customer_id` column exists on `users`, nothing else
