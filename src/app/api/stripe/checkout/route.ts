@@ -32,7 +32,7 @@ export async function POST(_req: NextRequest) {
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: 'subscription',
     line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-    success_url: `${process.env.NEXTAUTH_URL}/pricing?success=true`,
+    success_url: `${process.env.NEXTAUTH_URL}/`,
     cancel_url: `${process.env.NEXTAUTH_URL}/pricing?canceled=true`,
     ...(user.stripeCustomerId
       ? { customer: user.stripeCustomerId }
