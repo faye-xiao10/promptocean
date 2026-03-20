@@ -106,18 +106,23 @@ promptocean/
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── page.tsx            # homepage
-│   │   └── recipes/
-│   │       ├── page.tsx        # search + browse page
-│   │       └── [slug]/
-│   │           ├── page.tsx    # recipe detail
-│   │           └── not-found.tsx
+│   │   ├── recipes/
+│   │   │   ├── page.tsx        # search + browse page
+│   │   │   └── [slug]/
+│   │   │       ├── page.tsx    # recipe detail
+│   │   │       └── not-found.tsx
+│   │   └── submit/
+│   │       └── page.tsx        # recipe submission page
+│   ├── actions/
+│   │   └── recipes.ts          # submitRecipe server action
 │   ├── components/
 │   │   ├── AuthButton.tsx
 │   │   ├── CategoryCard.tsx
 │   │   ├── CopyButton.tsx
 │   │   ├── RecipeCard.tsx
 │   │   ├── SearchBar.tsx
-│   │   └── SessionProvider.tsx
+│   │   ├── SessionProvider.tsx
+│   │   └── SubmitRecipeForm.tsx
 │   ├── db/
 │   │   ├── index.ts            # drizzle instance (neon-http)
 │   │   ├── seed.ts
@@ -165,9 +170,26 @@ promptocean/
 
 ---
 
+## Step 6: Recipe Submission (branch: feature/submit-recipe)
+
+- `src/actions/recipes.ts` -- `'use server'` file with `submitRecipe(prevState, formData)`:
+  - Auth check via `auth()` (defense in depth, independent of middleware)
+  - Extracts title, description, instructions, category, platformIds (multi-value), tagIds (multi-value)
+  - Field validation with specific messages; returns `{ fieldErrors }` on failure
+  - `generateSlug()`: lowercase, strip non-alphanumeric, collapse hyphens, truncate to 80 chars, append 4-char random suffix, fallback to `'recipe'`
+  - Sequential inserts (neon-http does not support transactions): recipe first via `.returning({ id })`, then recipe_platforms, then recipe_tags
+  - Calls `redirect('/recipes/[slug]')` on success outside the try-catch
+- `src/lib/queries/recipes.ts` -- two new exports:
+  - `getAllPlatforms()` -- includes `id` field (needed for form checkbox values)
+  - `getAllTags()` -- returns `TagsByCategory` (`{ use_case, domain, style }` buckets)
+- `src/components/SubmitRecipeForm.tsx` -- `'use client'`; `useActionState` from React 19; general error banner; field-level `FieldError` component; instructions textarea is `font-mono` with `rows={14}`; platforms as `<fieldset>` checkboxes; tags in three grouped sections (Use Case / Domain / Style) in a 2-col grid; submit button disabled + "Submitting..." during `isPending`
+- `src/app/submit/page.tsx` -- server component; fetches platforms + tags in parallel; renders `SubmitRecipeForm`
+
+---
+
 ## Not Built Yet
 
-- **Submit page** -- `/submit` route protected by middleware but page doesn't exist yet
+- **Submit review/moderation** -- recipes submitted by users go live immediately, no review queue
 - **Dashboard** -- `/dashboard` route protected but page doesn't exist yet
 - **Upvoting** -- `upvotes` column exists, no UI action to increment it yet
 - **Stripe** -- `stripe_customer_id` column exists on `users`, nothing else

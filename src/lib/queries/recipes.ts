@@ -118,6 +118,32 @@ export async function getPlatforms(): Promise<{ name: string; slug: string }[]> 
     .orderBy(platforms.name);
 }
 
+export async function getAllPlatforms(): Promise<{ id: string; name: string; slug: string }[]> {
+  return db
+    .select({ id: platforms.id, name: platforms.name, slug: platforms.slug })
+    .from(platforms)
+    .orderBy(platforms.name);
+}
+
+export type TagsByCategory = {
+  use_case: { id: string; name: string }[];
+  domain: { id: string; name: string }[];
+  style: { id: string; name: string }[];
+};
+
+export async function getAllTags(): Promise<TagsByCategory> {
+  const rows = await db
+    .select({ id: tags.id, name: tags.name, category: tags.category })
+    .from(tags)
+    .orderBy(tags.name);
+
+  return {
+    use_case: rows.filter((t) => t.category === 'use_case').map(({ id, name }) => ({ id, name })),
+    domain: rows.filter((t) => t.category === 'domain').map(({ id, name }) => ({ id, name })),
+    style: rows.filter((t) => t.category === 'style').map(({ id, name }) => ({ id, name })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
